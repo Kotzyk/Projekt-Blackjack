@@ -5,6 +5,60 @@ Autorzy: Joanna Jeziorek, Mateusz Koziestański, Katarzyna Maciocha
 III 2016
 """
 import random as rd
+import pygame
+import sys, os
+from pygame.locals import *
+
+pygame.font.init()
+pygame.mixer.init()
+
+screen = pygame.display.set_mode((800, 480))
+clock = pygame.time.Clock()
+
+
+def load_image(img, card):
+    if card == 1:
+        fullname = os.path.join("karty/", name)
+    else: fullname = os.path.join('karty', name)
+    
+    try:
+        image = pygame.image.load(fullname)
+    except pygame.error, message:
+        print 'Nie można zaladować obrazu:', name
+        raise SystemExit, message
+    image = image.convert()
+    
+    return image, image.get_rect()
+    
+    
+def display(font, sentence):
+    """ Wyswietlacz tekstu na dole ekranu. Tekst sluży do informowania gracza o tym co sie dzieje."""
+    
+    displayFont = pygame.font.Font.render(font, sentence, 1, (255,255,255), (0,0,0)) 
+    return displayFont
+
+def gameOver():
+        """ 
+        Jesli graczowi skoncza sie pieniadze, wyswietla ekran koncowy. Gracz moze tylko zamknac gre.
+        """
+        
+        while 1:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    sys.exit()
+                if event.type == KEYDOWN and event.key == K_ESCAPE:
+                    sys.exit()
+
+            # Fill the screen with black
+            screen.fill((0,0,0))
+            
+            # Render "Game Over" sentence on the screen
+            oFont = pygame.font.Font(None, 50)
+            displayFont = pygame.font.Font.render(oFont, "Koniec gry! Skonczyly ci sie pieniadze!", 1, (255,255,255), (0,0,0)) 
+            screen.blit(displayFont, (125, 220))
+            
+            # Update the display
+            pygame.display.flip()
 
 
 def create_deck():
@@ -87,7 +141,21 @@ def value(hand):
         else:
             value_total += int(card[3])
 
-    if value_total > 21 and any(card for card in hand if card in aces):
-        value_total -= 10
+   if value_total > 21:
+            for card in hand:
+                if card[3] == 'a': 
+                    value_total -= 10
+                if value_total <= 21:
+                    break
+                else:
+                    continue
 
     return value_total
+
+
+def compare(deck, played_deck, player_hand, dealer_hand, funds, bet):
+    pv, dv = value(player_hand), value(dealer_hand)
+    while dv < 17:
+        deck, played_deck, dealer_hand = hit(deck, played_deck, dealer_hand)
+        dv = value(dealer_hand)
+        #do dokończenia
