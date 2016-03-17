@@ -214,4 +214,68 @@ def compare(deck, played_deck, player_hand, dealer_hand, funds, bet):
 
         return deck, played_deck, end_round, funds, display_font
 
-# ==============Koniec logiki gry=================
+# ==============Koniec logiki gry===============
+class CardSprite(pygame.sprite.Sprite):
+        """ Sprite wyświetlający określoną kartę. """
+
+        def __init__(self, card, position):
+            pygame.sprite.Sprite.__init__(self)
+            cardImage = card + ".png"
+            self.image, self.rect = load_image(cardImage, 1)
+            self.position = position
+        def update(self):
+            self.rect.center = self.position
+
+class BetButtonUp(pygame.sprite.Sprite):
+        """ Guzik zwiększający zakład """
+
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image, self.rect = load_image("up.png", 0)
+            self.position = (710, 255)
+
+        def update(self, mX, mY, bet, funds, click, end_round):
+            if end_round == 1:self.image, self.rect = load_image("up.png", 0)
+            else: self.image, self.rect = load_image("up-grey.png", 0)
+
+            self.position = (710, 255)
+            self.rect.center = self.position
+
+            if self.rect.collidepoint(mX, mY) == 1 and click == 1 and end_round == 1:
+                
+
+                if bet < funds:
+                    bet += 5.0
+                    if bet % 5 != 0:
+                        while bet % 5 != 0:
+                            bet -= 1
+
+                click = 0
+
+            return bet, click
+
+class BetButtonDown(pygame.sprite.Sprite):
+        """ Guzik zmniejszający zakład """
+
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image, self.rect = load_image("down.png", 0)
+            self.position = (710, 255)
+
+        def update(self, mX, mY, bet, click, end_round):
+            if end_round == 1: self.image, self.rect = load_image("down.png", 0)
+            else: self.image, self.rect = load_image("down-grey.png", 0)
+
+            self.position = (760, 255)
+            self.rect.center = self.position
+
+            if self.rect.collidepoint(mX, mY) == 1 and click == 1 and end_round == 1:
+                if bet > 5:
+                    bet -= 5.0
+                    if bet % 5 != 0:
+                        while bet % 5 != 0:
+                            bet += 1
+
+                click = 0
+
+            return bet, click
