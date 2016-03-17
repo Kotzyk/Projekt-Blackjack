@@ -4,9 +4,11 @@ Projekt zaliczeniowy - Języki Skryptowe, Informatyka i Ekonometria, rok 1, WZ, 
 Autorzy: Joanna Jeziorek, Mateusz Koziestański, Katarzyna Maciocha
 III 2016
 """
+
 import random as rd
 import pygame
-import sys, os
+import sys
+import os
 from pygame.locals import *
 
 pygame.font.init()
@@ -15,17 +17,18 @@ pygame.mixer.init()
 screen = pygame.display.set_mode((800, 480))
 clock = pygame.time.Clock()
 
+aces = ['ki_a', 'ka_a', 'pi_a', 'tr_a']
 
-def load_image(img, card):
+def load_image(imgname, card):
     if card == 1:
-        fullname = os.path.join("karty/", name)
-    else: fullname = os.path.join('karty', name)
+        fullname = os.path.join("obrazy/", imgname)
+    else: fullname = os.path.join('obrazy', imgname)
     
     try:
         image = pygame.image.load(fullname)
-    except pygame.error, message:
-        print 'Nie można zaladować obrazu:', name
-        raise SystemExit, message
+    except pygame.error as message:
+        print ('Nie można zaladować obrazu:', imgname)
+        raise (SystemExit, message)
     image = image.convert()
     
     return image, image.get_rect()
@@ -34,10 +37,12 @@ def load_image(img, card):
 def display(font, sentence):
     """ Wyswietlacz tekstu na dole ekranu. Tekst sluży do informowania gracza o tym co sie dzieje."""
     
-    displayFont = pygame.font.Font.render(font, sentence, 1, (255,255,255), (0,0,0)) 
-    return displayFont
+    display_font = pygame.font.Font.render(font, sentence, 1, (255,255,255), (0,0,0))
+    return display_font
 
-def gameOver():
+# =============Funkcje logiki gry==================
+
+def game_over():
         """ 
         Jesli graczowi skoncza sie pieniadze, wyswietla ekran koncowy. Gracz moze tylko zamknac gre.
         """
@@ -49,15 +54,14 @@ def gameOver():
                 if event.type == KEYDOWN and event.key == K_ESCAPE:
                     sys.exit()
 
-            # Fill the screen with black
+           # Czarny ekran
             screen.fill((0,0,0))
             
-            # Render "Game Over" sentence on the screen
+            # Napis Koniec Gry
             oFont = pygame.font.Font(None, 50)
-            displayFont = pygame.font.Font.render(oFont, "Koniec gry! Skonczyly ci sie pieniadze!", 1, (255,255,255), (0,0,0)) 
-            screen.blit(displayFont, (125, 220))
-            
-            # Update the display
+            display_font = pygame.font.Font.render(oFont, "Koniec gry! Skonczyly ci sie pieniadze!", 1, (255,255,255), (0,0,0)) 
+            screen.blit(display_font, (125, 220))
+
             pygame.display.flip()
 
 
@@ -91,7 +95,7 @@ def shuffle(deck):
 
 
 def return_played(deck, played_deck):
-    # Przekazuje zagrane karty do głównej talii.
+    # Przekazuje zagrane obrazy do głównej talii.
     # Zwraca potasowaną talię i pustą talię zagranych kart.
 
 
@@ -103,7 +107,7 @@ def return_played(deck, played_deck):
 
 
 def deck_deal(deck, played_deck):
-    # Jeśli talia nie jest pusta, rozdaje pierwsze cztery karty z talii na przemian graczowi i krupierowi.
+    # Jeśli talia nie jest pusta, rozdaje pierwsze cztery obrazy z talii na przemian graczowi i krupierowi.
     # Zwraca kolejno: talię, zagraną talię, rękę gracza i rękę krupiera
     dealer_hand, player_hand = [], []
 
@@ -132,7 +136,6 @@ def value(hand):
     # Jeśli w ręce znajduje się as, a wartość przekracza 21, zmienia wartość asa z 11 do 1pkt.
     # WYMAGA POPRAWKI w sytuacji gdy w ręce jest kilka asów.
     value_total = 0
-    aces = ['ki_a', 'ka_a', 'pi_a', 'tr_a']
     for card in hand:
         if card[3] == 'a':
             value_total += 11
@@ -141,7 +144,7 @@ def value(hand):
         else:
             value_total += int(card[3])
 
-   if value_total > 21:
+    if value_total > 21:
             for card in hand:
                 if card[3] == 'a': 
                     value_total -= 10
@@ -149,8 +152,40 @@ def value(hand):
                     break
                 else:
                     continue
-
     return value_total
+
+
+def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, cards, card_sprite):
+
+    if len(player_hand) == 2 and player_hand[:1] in aces:
+        money_gain += (money_gain*3 /2.0)
+
+    cards.empty()
+
+    dCardPos = (50, 70)
+
+    for x in dealer_hand:
+        card = CardSprite(x, dCardPos)
+        dCardPos = (dCardPos[0] + 80, dCardPos [1])
+        cards.add(card)
+
+    # Remove the cards from the player's and dealer's hands
+    for card in player_hand:
+        played_deck.append(dealer_hand.pop(card))
+    for card in dealer_hand:
+        played_deck.append(player_hand.pop(card))
+
+    funds += money_gain
+    funds -= money_loss
+
+    display_font = pygame.font.Font(None, 28)
+
+    if funds <= 0:
+        game_over()
+
+    end_round = 1
+
+    return deck, player_hand, dealer_hand, played_deck, funds, end_round
 
 
 def compare(deck, played_deck, player_hand, dealer_hand, funds, bet):
@@ -158,4 +193,25 @@ def compare(deck, played_deck, player_hand, dealer_hand, funds, bet):
     while dv < 17:
         deck, played_deck, dealer_hand = hit(deck, played_deck, dealer_hand)
         dv = value(dealer_hand)
-        #do dokończenia
+
+    if dv < pv <= 21:
+        # Gracz wygrywa
+            funds += 2*bet
+            deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand, played_deck, funds, bet, 0, cards, CardSprite)
+            display_font = display(display_font, "Wygrana: $%.2f." %bet)
+        elif pv == dv and pv <= 21:
+            # Remis
+            deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand, played_deck, funds, 0, 0, cards, CardSprite)
+            display_font = display(display_font, "Remis!")
+        elif dv > 21 >= pv:
+            # Krupier przebił, a gracz nie
+            deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand, played_deck, funds, bet, 0, cards, CardSprite)
+            display_font = display(display_font, "Krupier przebił! Wygrana: $%.2f." %bet)
+        else:
+            # W każdej innej sytuacji krupier wygrywa
+            deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand, played_deck, funds, 0, bet, cards, CardSprite)
+            display_font = display(display_font, "Krzupier wygrywa! Przegrana $%.2f." %bet)
+
+        return deck, played_deck, end_round, funds, display_font
+
+# ==============Koniec logiki gry=================
