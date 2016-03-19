@@ -279,3 +279,138 @@ class BetButtonDown(pygame.sprite.Sprite):
                 click = 0
 
             return bet, click
+            
+class HitButton(pygame.sprite.Sprite):
+        """ Guzik pozwalający graczowi dobrać kartę z talii. """
+
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image, self.rect = load_image("hit-grey.png", 0)
+            self.position = (735, 400)
+
+        def update(self, mX, mY, deck, played_deck, player_hand, cards, pCardPos, end_round, CardSprite, click):
+
+            if end_round == 0: self.image, self.rect = load_image("hit.png", 0)
+            else: self.image, self.rect = load_image("hit-grey.png", 0)
+
+            self.position = (735, 400)
+            self.rect.center = self.position
+
+            if self.rect.collidepoint(mX, mY) == 1 and click == 1:
+                if end_round == 0:
+
+                    deck, played_deck, player_hand = hit(deck, played_deck, player_hand)
+
+                    current_card = len(player_hand) - 1
+                    card = CardSprite(player_hand[current_card], pCardPos)
+                    cards.add(card)
+                    pCardPos = (pCardPos[0] - 80, pCardPos[1])
+
+                    click = 0
+
+            return deck, played_deck, player_hand, pCardPos, click
+
+class StandButton(pygame.sprite.Sprite):
+        """ Guzik umożliwiający graczowi zostanie przy obecnej liczbie kart. """
+
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image, self.rect = load_image("stand-grey.png", 0)
+            self.position = (735, 365)
+
+        def update(self, mX, mY, deck, played_deck, player_hand, dealer_hand, cards, pCardPos, end_round, CardSprite, funds, bet, display_font):
+
+            if end_round == 0: self.image, self.rect = load_image("stand.png", 0)
+            else: self.image, self.rect = load_image("stand-grey.png", 0)
+
+            self.position = (735, 365)
+            self.rect.center = self.position
+
+            if self.rect.collidepoint(mX, mY) == 1:
+                if end_round == 0:
+
+                    deck, played_deck, end_round, funds, display_font = compare(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, CardSprite)
+
+            return deck, played_deck, end_round, funds, player_hand, played_deck, pCardPos, display_font
+
+class DoubleButton(pygame.sprite.Sprite):
+        """ Guzik umożliwiający graczowi podwojenie zakładu i wzięcie jedynej dodatkowej karty."""
+
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image, self.rect = load_image("double-grey.png", 0)
+            self.position = (735, 330)
+
+        def update(self, mX, mY,   deck, played_deck, player_hand, dealer_hand, playerCards, cards, pCardPos, end_round, CardSprite, funds, bet, display_font):
+
+            if end_round == 0 and funds >= bet * 2 and len(player_hand) == 2: self.image, self.rect = load_image("double.png", 0)
+            else: self.image, self.rect = load_image("double-grey.png", 0)
+
+            self.position = (735, 330)
+            self.rect.center = self.position
+
+            if self.rect.collidepoint(mX, mY) == 1:
+                if end_round == 0 and funds >= bet * 2 and len(player_hand) == 2:
+                    bet = bet * 2
+
+
+                    deck, played_deck, player_hand = hit(deck, played_deck, player_hand)
+
+                    current_card = len(player_hand) - 1
+                    card = CardSprite(player_hand[current_card], pCardPos)
+                    playerCards.add(card)
+                    pCardPos = (pCardPos[0] - 80, pCardPos[1])
+
+                    deck, played_deck, end_round, funds, display_font = compare(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, CardSprite)
+
+                    bet = bet / 2
+
+            return deck, played_deck, end_round, funds, player_hand, played_deck, pCardPos, display_font, bet
+
+class DealButton(pygame.sprite.Sprite):
+        """ Guzik umożliwiający rozpoczęcie nowej rundy / rozdania """
+
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image, self.rect = load_image("deal.png", 0)
+            self.position = (735, 450)
+
+        def update(self, mX, mY, deck, played_deck, end_round, CardSprite, cards, player_hand, dealer_hand, dCardPos, pCardPos, display_font, playerCards, click, handsPlayed):
+           
+            textFont = pygame.font.Font(None, 28)
+
+            if end_round == 1: self.image, self.rect = load_image("deal.png", 0)
+            else: self.image, self.rect = load_image("deal-grey.png", 0)
+
+            self.position = (735, 450)
+            self.rect.center = self.position
+
+
+            if self.rect.collidepoint(mX, mY) == 1:
+                if end_round == 1 and click == 1:
+                    display_font = display(textFont, "")
+
+                    cards.empty()
+                    playerCards.empty()
+
+                    deck, played_deck, player_hand, dealer_hand = deck_deal(deck, played_deck)
+
+                    dCardPos = (50, 70)
+                    pCardPos = (540,370)
+
+                    for x in player_hand:
+                        card = CardSprite(x, pCardPos)
+                        pCardPos = (pCardPos[0] - 80, pCardPos [1])
+                        playerCards.add(card)
+
+                    faceDownCard = CardSprite("back", dCardPos)
+                    dCardPos = (dCardPos[0] + 80, dCardPos[1])
+                    cards.add(faceDownCard)
+
+                    card = CardSprite(dealer_hand [0], dCardPos)
+                    cards.add(card)
+                    end_round = 0
+                    click = 0
+                    handsPlayed += 1
+
+            return deck, played_deck, player_hand, dealer_hand, dCardPos, pCardPos, end_round, display_font, click, handsPlayed
