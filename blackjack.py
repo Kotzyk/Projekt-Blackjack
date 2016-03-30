@@ -4,9 +4,8 @@ Projekt zaliczeniowy - Języki Skryptowe, Informatyka i Ekonometria, rok 1, WZ, 
 Autorzy: Joanna Jeziorek, Mateusz Koziestański, Katarzyna Maciocha
 III 2016
 """
-
-import os
 import random as rd
+import os
 import sys
 import pygame
 from pygame import *
@@ -16,11 +15,19 @@ pygame.mixer.init()
 
 screen = pygame.display.set_mode((800, 480))
 clock = pygame.time.Clock()
+# poniższe zmienne muszę wstępnie zadeklarować tu, bo inaczej wywala błędy niżej w metodach.
 display_font = pygame.font.Font(None, 28)
 aces = ['ki_a', 'ka_a', 'pi_a', 'tr_a']
 player_hand, dealer_hand = [], []
 
+
 def load_image(imgname, card):
+    """
+    Metoda do wczytywania plików obrazów.
+    :param imgname: nazwa pliku png
+    :param card: obiekt karty
+    :return: zwraca obraz oraz prostokąt go ograniczający
+    """
     if card == 1:
         fullname = os.path.join("obrazy/karty", imgname)
     else:
@@ -103,10 +110,9 @@ def return_played(deck, played_deck):
     # Przekazuje zagrane obrazy do głównej talii.
     # Zwraca potasowaną talię i pustą talię zagranych kart.
 
-
     for card in played_deck:
-        deck.append(card)
-        del card
+        deck.append(played_deck.pop())
+        
     shuffle(deck)
     return deck, played_deck
 
@@ -116,23 +122,29 @@ def deck_deal(deck, played_deck):
     # Zwraca kolejno: talię, zagraną talię, rękę gracza i rękę krupiera
     dealer_hand, player_hand = [], []
     shuffle(deck)
-    if not deck:
-        return_played(deck, played_deck)
+    if len(deck) < 5:
+        deck, played_deck = return_played(deck, played_deck)
 
+#wymaga dopracowania zwracania kart do talii, jeśli jest już pusta.
     dealer_hand.append(deck.pop(0))
+    played_deck.append(dealer_hand[-1])
     player_hand.append(deck.pop(0))
+    played_deck.append(player_hand[-1])
     dealer_hand.append(deck.pop(0))
+    played_deck.append(dealer_hand[-1])
     player_hand.append(deck.pop(0))
+    played_deck.append(player_hand[-1])
 
     return deck, played_deck, player_hand, dealer_hand
 
 
 def hit(deck, played_deck, hand):
     # Jeśli talia nie jest pusta, daje graczowi kartę do ręki.
-    if not deck:
-        return_played(deck, played_deck)
+    if len(deck) < 2:
+        deck, played_deck = return_played(deck, played_deck)
 
     hand.append(deck.pop(0))
+    played_deck.append(hand[-1])
     return deck, played_deck, hand
 
 
@@ -159,25 +171,28 @@ def value(hand):
     return value_total
 
 
-def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, cards, CardSprite):
+def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, dealer_cards, CardSprite):
     if len(player_hand) == 2 and player_hand[:1] in aces:
         money_gain += (money_gain * 3 / 2.0)
 
-    cards.empty()
+    dealer_cards.empty()
 
     dealer_card_position = (50, 70)
 
     for x in dealer_hand:
         card = CardSprite(x, dealer_card_position)
         dealer_card_position = (dealer_card_position[0] + 80, dealer_card_position[1])
-        cards.add(card)
+        dealer_cards.add(card)
 
     # Remove the cards from the player's and dealer's hands
     if not dealer_hand:
         for card in player_hand:
-            played_deck.append(dealer_hand.pop())
+            played_deck.append(card)
+            player_hand.pop()
         for card in dealer_hand:
-            played_deck.append(player_hand.pop())
+            played_deck.append(card)
+            dealer_hand.pop()
+            
 
     funds += money_gain
     funds -= money_loss
@@ -192,19 +207,21 @@ def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, mo
     return deck, player_hand, dealer_hand, played_deck, funds, end_round
 
 
-def bust(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, cards, CardSprite):
+def bust(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, dealer_cards, CardSprite):
     """ This is only called when player busts by drawing too many cards. """
 
     font = pygame.font.Font(None, 28)
-    display_font = display(font, "You bust! You lost $%.2f." % (money_loss))
+    display_font = display(font, "Gracz przebił! Przegrana: $%.1f." % money_loss)
 
-    deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand, played_deck, funds,
-                                                                       money_gain, money_loss, cards, CardSprite)
+    deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
+                                                                              played_deck, funds,
+                                                                              money_gain, money_loss, dealer_cards,
+                                                                              CardSprite)
 
     return deck, player_hand, dealer_hand, played_deck, funds, end_round, display_font
 
 
-def compare(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, CardSprite):
+def compare(deck, played_deck, player_hand, dealer_hand, funds, bet, dealer_cards, CardSprite):
     pv, dv = value(player_hand), value(dealer_hand)
     display_font = pygame.font.Font(None, 28)
     while dv < 17:
@@ -215,33 +232,37 @@ def compare(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, Card
         # Gracz wygrywa
         funds += 2 * bet
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
-                                                                                  played_deck, funds, bet, 0, cards,
+                                                                                  played_deck, funds, bet, 0,
+                                                                                  dealer_cards,
                                                                                   CardSprite)
         display_font = display(display_font, "Wygrana: $%.1f." % bet)
     elif pv == dv and pv <= 21:
         # Remis
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
-                                                                                  played_deck, funds, 0, 0, cards,
+                                                                                  played_deck, funds, 0, 0,
+                                                                                  dealer_cards,
                                                                                   CardSprite)
         display_font = display(display_font, "Remis!")
     elif dv > 21 >= pv:
         # Krupier przebił, a gracz nie
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
-                                                                                  played_deck, funds, bet, 0, cards,
+                                                                                  played_deck, funds, bet, 0,
+                                                                                  dealer_cards,
                                                                                   CardSprite)
         display_font = display(display_font, "Krupier przebił! Wygrana: $%.1f." % bet)
     else:
         # W każdej innej sytuacji krupier wygrywa
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
-                                                                                  played_deck, funds, 0, bet, cards,
+                                                                                  played_deck, funds, 0, bet,
+                                                                                  dealer_cards,
                                                                                   CardSprite)
         display_font = display(display_font, "Krupier wygrywa! Przegrana $%.1f." % bet)
 
     return deck, played_deck, end_round, funds, display_font
 
 
-def blackJack(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, CardSprite):
-    """ Called when the player or the dealer is determined to have blackjack. Hands are compared to determine the outcome. """
+def blackJack(deck, played_deck, player_hand, dealer_hand, funds, bet, dealer_cards, CardSprite):
+    """ Metoda sprawdzająca, czy któryś z graczy ma blackjack (BJ) """
 
     textFont = pygame.font.Font(None, 28)
 
@@ -249,26 +270,28 @@ def blackJack(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, Ca
     dv = value(dealer_hand)
 
     if pv == 21 and dv == 21:
-        # The opposing player ties the original blackjack getter because he also has blackjack
-        # No money will be lost, and a new hand will be dealt
-        display_font = display(textFont, "Blackjack! The dealer also has blackjack, so it's a push!")
+        # Zarówno gracz, jak i krupier mają BJ, jest remis i nikt nie traci pieniędzy.
+        display_font = display(textFont, "Blackjack! Krupier także go ma, więc jest remis!")
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
                                                                                   played_deck,
-                                                                                  funds, 0, bet, cards, CardSprite)
+                                                                                  funds, 0, bet, dealer_cards,
+                                                                                  CardSprite)
 
     elif pv == 21 and dv != 21:
-        # Dealer loses
-        display_font = display(textFont, "Blackjack! You won $%.1f." % (bet * 1.5))
+        # Krupier przegrywa, gracz ma BJ
+        display_font = display(textFont, "Blackjack! Wygrana: $%.1f." % (bet * 1.5))
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
                                                                                   played_deck,
-                                                                                  funds, bet, 0, cards, CardSprite)
+                                                                                  funds, bet, 0, dealer_cards,
+                                                                                  CardSprite)
 
     elif dv == 21 and pv != 21:
-        # Player loses, money is lost, and new hand will be dealt
+        # Gracz przegrywa, a krupier ma BJ
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
                                                                                   played_deck,
-                                                                                  funds, 0, bet, cards, CardSprite)
-        display_font = display(textFont, "Dealer has blackjack! You lose $%.1f." % (bet))
+                                                                                  funds, 0, bet, dealer_cards,
+                                                                                  CardSprite)
+        display_font = display(textFont, "Krupier ma blackjack! Przegrana: $%.1f." % bet)
 
     return display_font, player_hand, dealer_hand, played_deck, funds, end_round
 
@@ -279,27 +302,31 @@ class CardSprite(pygame.sprite.Sprite):
 
     def __init__(self, card, position):
         pygame.sprite.Sprite.__init__(self)
-        cardImage = card + ".png"
-        self.image, self.rect = load_image(cardImage, 1)
+        card_image = card + ".png"
+        self.image, self.rect = load_image(card_image, 1)
         self.position = position
 
     def update(self):
         self.rect.center = self.position
 
 
+# metoda update w każdym guziku to zasadniczo instrukcja wykonywania funkcjonalności każdego guzika po kliknięciu
+
+
 class BetButtonUp(pygame.sprite.Sprite):
     """ Guzik zwiększający zakład """
 
+    # noinspection PyTypeChecker
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image, self.rect = load_image("arrow_up.png", 0)
-        self.position = (710, 255)
+        self.position = (710, 225)
 
     def update(self, mX, mY, bet, funds, click, end_round):
 
         self.image, self.rect = load_image("arrow_up.png", 0)
 
-        self.position = (710, 255)
+        self.position = (710, 225)
         self.rect.center = self.position
 
         if self.rect.collidepoint(mX, mY) == 1 and click == 1 and end_round == 1:
@@ -321,12 +348,12 @@ class BetButtonDown(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image, self.rect = load_image("arrow_down.png", 0)
-        self.position = (710, 255)
+        self.position = (710, 225)
 
     def update(self, mX, mY, bet, click, end_round):
         self.image, self.rect = load_image("arrow_down.png", 0)
 
-        self.position = (760, 255)
+        self.position = (760, 225)
         self.rect.center = self.position
 
         if self.rect.collidepoint(mX, mY) == 1 and click == 1 and end_round == 1:
@@ -347,13 +374,14 @@ class HitButton(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image, self.rect = load_image("hit.png", 0)
-        self.position = (735, 400)
+        self.position = (735, 390)
 
-    def update(self, mX, mY, deck, played_deck, player_hand, cards, player_card_position, end_round, CardSprite, click):
+    def update(self, mX, mY, deck, played_deck, player_hand, dealer_cards, player_card_position, end_round, CardSprite,
+               click):
 
         self.image, self.rect = load_image("hit.png", 0)
 
-        self.position = (735, 400)
+        self.position = (735, 390)
         self.rect.center = self.position
 
         if self.rect.collidepoint(mX, mY) == 1 and click == 1:
@@ -362,7 +390,7 @@ class HitButton(pygame.sprite.Sprite):
 
                 current_card = len(player_hand) - 1
                 card = CardSprite(player_hand[current_card], player_card_position)
-                cards.add(card)
+                dealer_cards.add(card)
                 player_card_position = (player_card_position[0] - 80, player_card_position[1])
 
                 click = 0
@@ -376,21 +404,21 @@ class StandButton(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image, self.rect = load_image("stand.png", 0)
-        self.position = (735, 365)
+        self.position = (735, 350)
 
-    def update(self, mX, mY, deck, played_deck, player_hand, dealer_hand, cards, player_card_position, end_round,
+    def update(self, mX, mY, deck, played_deck, player_hand, dealer_hand, dealer_cards, player_card_position, end_round,
                CardSprite, funds,
                bet, display_font):
 
         self.image, self.rect = load_image("stand.png", 0)
 
-        self.position = (735, 365)
+        self.position = (735, 350)
         self.rect.center = self.position
 
         if self.rect.collidepoint(mX, mY) == 1:
             if end_round == 0:
                 deck, played_deck, end_round, funds, display_font = compare(deck, played_deck, player_hand, dealer_hand,
-                                                                            funds, bet, cards, CardSprite)
+                                                                            funds, bet, dealer_cards, CardSprite)
 
         return deck, played_deck, end_round, funds, player_hand, played_deck, player_card_position, display_font
 
@@ -401,15 +429,16 @@ class DoubleButton(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image, self.rect = load_image("double.png", 0)
-        self.position = (735, 330)
+        self.position = (735, 305)
 
-    def update(self, mX, mY, deck, played_deck, player_hand, dealer_hand, playerCards, cards, player_card_position,
+    def update(self, mX, mY, deck, played_deck, player_hand, dealer_hand, playerCards, dealer_cards,
+               player_card_position,
                end_round,
                CardSprite, funds, bet, display_font):
 
         self.image, self.rect = load_image("double.png", 0)
 
-        self.position = (735, 330)
+        self.position = (735, 305)
         self.rect.center = self.position
 
         if self.rect.collidepoint(mX, mY) == 1:
@@ -424,7 +453,7 @@ class DoubleButton(pygame.sprite.Sprite):
                 player_card_position = (player_card_position[0] - 80, player_card_position[1])
 
                 deck, played_deck, end_round, funds, display_font = compare(deck, played_deck, player_hand, dealer_hand,
-                                                                            funds, bet, cards, CardSprite)
+                                                                            funds, bet, dealer_cards, CardSprite)
 
                 bet /= 2
 
@@ -437,9 +466,9 @@ class DealButton(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image, self.rect = load_image("deal.png", 0)
-        self.position = (735, 450)
+        self.position = (735, 430)
 
-    def update(self, mX, mY, deck, played_deck, end_round, CardSprite, cards, player_hand, dealer_hand,
+    def update(self, mX, mY, deck, played_deck, end_round, CardSprite, dealer_cards, player_hand, dealer_hand,
                dealer_card_posit,
                player_card_position, display_font, playerCards, click, handsPlayed) -> object:
 
@@ -447,14 +476,14 @@ class DealButton(pygame.sprite.Sprite):
 
         self.image, self.rect = load_image("deal.png", 0)
 
-        self.position = (735, 450)
+        self.position = (735, 430)
         self.rect.center = self.position
 
         if self.rect.collidepoint(mX, mY) == 1:
             if end_round == 1 and click == 1:
                 display_font = display(textFont, "")
 
-                cards.empty()
+                dealer_cards.empty()
                 playerCards.empty()
 
                 deck, played_deck, player_hand, dealer_hand = deck_deal(deck, played_deck)
@@ -469,10 +498,10 @@ class DealButton(pygame.sprite.Sprite):
 
                 faceDownCard = CardSprite("back", dealer_card_posit)
                 dealer_card_posit = (dealer_card_posit[0] + 80, dealer_card_posit[1])
-                cards.add(faceDownCard)
+                dealer_cards.add(faceDownCard)
 
                 card = CardSprite(dealer_hand[0], dealer_card_posit)
-                cards.add(card)
+                dealer_cards.add(card)
                 end_round = 0
                 click = 0
                 handsPlayed += 1
@@ -480,18 +509,18 @@ class DealButton(pygame.sprite.Sprite):
         return deck, played_deck, player_hand, dealer_hand, dealer_card_posit, player_card_position, end_round, display_font, click, handsPlayed
 
 
-# This font is used to display text on the right-hand side of the screen
+# czcionka używana po prawej stronie ekranu (fundusze, zakład itd)
 textFont = pygame.font.Font(None, 28)
 
-# This sets up the background image, and its container rect
+# ustawiam plik tła/ planszy
 background, backgroundRect = load_image("plansza.png", 0)
 
-# cards is the sprite group that will contain sprites for the dealer's cards
-cards = pygame.sprite.Group()
-# playerCards will serve the same purpose, but for the player
+# grupa grafik kart krupiera
+dealer_cards = pygame.sprite.Group()
+# jak wyżej, tylko dla gracza
 player_cards = pygame.sprite.Group()
 
-# This creates instances of all the button sprites
+# Tworzę instancje wszystkich guzików
 bet_up = BetButtonUp()
 bet_down = BetButtonDown()
 stand_button = StandButton()
@@ -499,33 +528,28 @@ deal_butt = DealButton()
 hit_butt = HitButton()
 dbl_butt = DoubleButton()
 
-# This group containts the button sprites
+# Grupa zawierająca wszystkie guziki
 buttons = pygame.sprite.Group(bet_up, bet_down, hit_butt, stand_button, deal_butt, dbl_butt)
 
-# The 52 card deck is created
+# Tworzę talię
 deck = create_deck()
-# The dead deck will contain cards that have been discarded
+# Definiuję pusty zbiór zużytych kart
 played_deck = []
 
-# These are default values that will be changed later, but are required to be declared now
-# so that Python doesn't get confused
-player_hand, dealer_hand, dealer_card_position, player_card_position = [], [], (), ()
+dealer_card_position, player_card_position = (), ()
 mX, mY = 0, 0
 click = 0
 
-# The default funds start at $100.00, and the initial bet defaults to $10.00
+# Startowe wartości stawki i banku.
 funds = 100.0
 bet = 10.0
 
-# This is a counter that counts the number of rounds played in a given session
+# Ile rund zostało zagrane - inicjalizacja zmiennej
 handsPlayed = 0
 
-# When the cards have been dealt, end_round is zero.
-# In between rounds, it is equal to one
+# Zmienna używana do oznaczenia końca rundy. Równa 0, oprócz pomiędzy rundami, gdzie ma wartość 1.
 end_round = 1
 
-# firstTime is a variable that is only used once, to display the initial
-# message at the bottom, then it is set to zero for the duration of the program.
 firstTime = 1
 
 while 1:
@@ -537,17 +561,17 @@ while 1:
 
     if end_round == 1 and firstTime == 1:
         # When the player hasn't started. Will only be displayed the first time.
-        display_font = display(textFont, "Click on the arrows to declare your bet, then deal to start the game.")
+        display_font = display(textFont,
+                               "Klikaj w strzałki, aby określić stawkę. Potem wciśnij Deal aby rozpocząć grę.")
         firstTime = 0
 
-    # Show the blurb at the bottom of the screen, how much money left, and current bet
-    screen.blit(display_font, (10, 444))
-    fundsFont = pygame.font.Font.render(textFont, "Funds: $%.1f" % (funds), 1, (255, 255, 255), (0, 0, 0))
-    screen.blit(fundsFont, (663, 205))
-    betFont = pygame.font.Font.render(textFont, "Bet: $%.1f" % (bet), 1, (255, 255, 255), (0, 0, 0))
-    screen.blit(betFont, (680, 285))
-    hpFont = pygame.font.Font.render(textFont, "Round: %i " % (handsPlayed), 1, (255, 255, 255), (0, 0, 0))
-    screen.blit(hpFont, (663, 180))
+    screen.blit(display_font, (10, 455))
+    fundsFont = pygame.font.Font.render(textFont, "Bank: $%.1f" % funds, 1, (255, 255, 255), (0, 0, 0))
+    screen.blit(fundsFont, (658, 175))
+    betFont = pygame.font.Font.render(textFont, "Stawka: $%.1f" % bet, 1, (255, 255, 255), (0, 0, 0))
+    screen.blit(betFont, (658, 259))
+    hpFont = pygame.font.Font.render(textFont, "Runda: %i " % handsPlayed, 1, (255, 255, 255), (0, 0, 0))
+    screen.blit(hpFont, (658, 150))
 
     for event in pygame.event.get():
         if event.type == QUIT:
@@ -560,41 +584,41 @@ while 1:
             mX, mY = 0, 0
             click = 0
 
-    # Initial check for the value of the player's hand, so that his hand can be displayed and it can be determined
-    # if the player busts or has blackjack or not
+    # początkowe sprawdzenie, czy po rozdaniu dwóch pierwszych kart ktoś ma blackjack.
+    # Jako że nie umiem zaprogramować "insurance bet" , jeśli krupier ma BJ od razu, to od razu wygrywa.
     if end_round == 0:
-        # Stuff to do when the game is happening
+        # to co dzieje się w trakcie rundy
         pv = value(player_hand)
         dv = value(dealer_hand)
 
         if pv == 21 and len(player_hand) == 2:
-            # If the player gets blackjack
+            # Jeśli gracz ma BJ
             display_font, player_hand, dealer_hand, played_deck, funds, end_round = blackJack(deck, played_deck,
                                                                                               player_hand,
                                                                                               dealer_hand, funds, bet,
-                                                                                              cards,
+                                                                                              dealer_cards,
                                                                                               CardSprite)
 
         if dv == 21 and len(dealer_hand) == 2:
-            # If the dealer has blackjack
+            # Jeśli krupier ma BJ
             display_font, player_hand, dealer_hand, played_deck, funds, end_round = blackJack(deck, played_deck,
                                                                                               player_hand,
                                                                                               dealer_hand, funds, bet,
-                                                                                              cards,
+                                                                                              dealer_cards,
                                                                                               CardSprite)
 
         if pv > 21:
-            # If player busts
+            # Jesli gracz przebił
             deck, player_hand, dealer_hand, played_deck, funds, end_round, display_font = bust(deck, player_hand,
                                                                                                dealer_hand,
                                                                                                played_deck, funds, 0,
-                                                                                               bet, cards,
+                                                                                               bet, dealer_cards,
                                                                                                CardSprite)
 
-    # Update the buttons
+    # Update guzików
     # deal
     deck, played_deck, player_hand, dealer_hand, dealer_card_position, player_card_position, end_round, display_font, click, handsPlayed = deal_butt.update(
-        mX, mY, deck, played_deck, end_round, CardSprite, cards, player_hand, dealer_hand, dealer_card_position,
+        mX, mY, deck, played_deck, end_round, CardSprite, dealer_cards, player_hand, dealer_hand, dealer_card_position,
         player_card_position, display_font,
         player_cards, click, handsPlayed)
     # hit
@@ -611,7 +635,7 @@ while 1:
         played_deck,
         player_hand,
         dealer_hand,
-        cards,
+        dealer_cards,
         player_card_position,
         end_round,
         CardSprite,
@@ -627,25 +651,25 @@ while 1:
         player_hand,
         dealer_hand,
         player_cards,
-        cards,
+        dealer_cards,
         player_card_position,
         end_round,
         CardSprite,
         funds,
         bet,
         display_font)
-    # Bet buttons
+    # Stawka - guziki
     bet, click = bet_up.update(mX, mY, bet, funds, click, end_round)
     bet, click = bet_down.update(mX, mY, bet, click, end_round)
-    # draw them to the screen
+    # wrzucam je na ekran.
     buttons.draw(screen)
 
-    # If there are cards on the screen, draw them
-    if len(cards) is not 0:
+    # jeśli są karty na ekranie, wrzuć je tam
+    if dealer_cards:
         player_cards.update()
         player_cards.draw(screen)
-        cards.update()
-        cards.draw(screen)
+        dealer_cards.update()
+        dealer_cards.draw(screen)
 
-    # Updates the contents of the display
+    # update okna gry
     pygame.display.flip()
