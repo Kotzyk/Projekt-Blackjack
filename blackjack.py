@@ -8,17 +8,17 @@ III 2016
 import os
 import random as rd
 import sys
-
 import pygame
+from pygame import *
 
 pygame.font.init()
 pygame.mixer.init()
 
 screen = pygame.display.set_mode((800, 480))
 clock = pygame.time.Clock()
-
+display_font = pygame.font.Font(None, 28)
 aces = ['ki_a', 'ka_a', 'pi_a', 'tr_a']
-
+player_hand, dealer_hand = [], []
 
 def load_image(imgname, card):
     if card == 1:
@@ -115,14 +115,14 @@ def deck_deal(deck, played_deck):
     # Jeśli talia nie jest pusta, rozdaje pierwsze cztery obrazy z talii na przemian graczowi i krupierowi.
     # Zwraca kolejno: talię, zagraną talię, rękę gracza i rękę krupiera
     dealer_hand, player_hand = [], []
-
+    shuffle(deck)
     if not deck:
         return_played(deck, played_deck)
 
-    dealer_hand.append(deck.pop(i=0))
-    player_hand.append(deck.pop(i=0))
-    dealer_hand.append(deck.pop(i=0))
-    player_hand.append(deck.pop(i=0))
+    dealer_hand.append(deck.pop(0))
+    player_hand.append(deck.pop(0))
+    dealer_hand.append(deck.pop(0))
+    player_hand.append(deck.pop(0))
 
     return deck, played_deck, player_hand, dealer_hand
 
@@ -132,14 +132,13 @@ def hit(deck, played_deck, hand):
     if not deck:
         return_played(deck, played_deck)
 
-    hand.append(deck.pop(i=0))
+    hand.append(deck.pop(0))
     return deck, played_deck, hand
 
 
 def value(hand):
     # Oblicza wartość kart w ręce.
     # Jeśli w ręce znajduje się as, a wartość przekracza 21, zmienia wartość asa z 11 do 1pkt.
-    # WYMAGA POPRAWKI w sytuacji gdy w ręce jest kilka asów.
     value_total = 0
     for card in hand:
         if card[3] == 'a':
@@ -160,7 +159,7 @@ def value(hand):
     return value_total
 
 
-def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, cards, card_sprite):
+def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, cards, CardSprite):
     if len(player_hand) == 2 and player_hand[:1] in aces:
         money_gain += (money_gain * 3 / 2.0)
 
@@ -174,10 +173,11 @@ def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, mo
         cards.add(card)
 
     # Remove the cards from the player's and dealer's hands
-    for card in player_hand:
-        played_deck.append(dealer_hand.pop(card))
-    for card in dealer_hand:
-        played_deck.append(player_hand.pop(card))
+    if not dealer_hand:
+        for card in player_hand:
+            played_deck.append(dealer_hand.pop())
+        for card in dealer_hand:
+            played_deck.append(player_hand.pop())
 
     funds += money_gain
     funds -= money_loss
@@ -192,8 +192,21 @@ def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, mo
     return deck, player_hand, dealer_hand, played_deck, funds, end_round
 
 
-def compare(deck, played_deck, player_hand, dealer_hand, funds, bet):
+def bust(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, cards, CardSprite):
+    """ This is only called when player busts by drawing too many cards. """
+
+    font = pygame.font.Font(None, 28)
+    display_font = display(font, "You bust! You lost $%.2f." % (money_loss))
+
+    deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand, played_deck, funds,
+                                                                       money_gain, money_loss, cards, CardSprite)
+
+    return deck, player_hand, dealer_hand, played_deck, funds, end_round, display_font
+
+
+def compare(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, CardSprite):
     pv, dv = value(player_hand), value(dealer_hand)
+    display_font = pygame.font.Font(None, 28)
     while dv < 17:
         deck, played_deck, dealer_hand = hit(deck, played_deck, dealer_hand)
         dv = value(dealer_hand)
@@ -204,7 +217,7 @@ def compare(deck, played_deck, player_hand, dealer_hand, funds, bet):
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
                                                                                   played_deck, funds, bet, 0, cards,
                                                                                   CardSprite)
-        display_font = display(display_font, "Wygrana: $%.2f." % bet)
+        display_font = display(display_font, "Wygrana: $%.1f." % bet)
     elif pv == dv and pv <= 21:
         # Remis
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
@@ -216,13 +229,13 @@ def compare(deck, played_deck, player_hand, dealer_hand, funds, bet):
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
                                                                                   played_deck, funds, bet, 0, cards,
                                                                                   CardSprite)
-        display_font = display(display_font, "Krupier przebił! Wygrana: $%.2f." % bet)
+        display_font = display(display_font, "Krupier przebił! Wygrana: $%.1f." % bet)
     else:
         # W każdej innej sytuacji krupier wygrywa
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
                                                                                   played_deck, funds, 0, bet, cards,
                                                                                   CardSprite)
-        display_font = display(display_font, "Krzupier wygrywa! Przegrana $%.2f." % bet)
+        display_font = display(display_font, "Krupier wygrywa! Przegrana $%.1f." % bet)
 
     return deck, played_deck, end_round, funds, display_font
 
@@ -245,7 +258,7 @@ def blackJack(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, Ca
 
     elif pv == 21 and dv != 21:
         # Dealer loses
-        display_font = display(textFont, "Blackjack! You won $%.2f." % (bet * 1.5))
+        display_font = display(textFont, "Blackjack! You won $%.1f." % (bet * 1.5))
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
                                                                                   played_deck,
                                                                                   funds, bet, 0, cards, CardSprite)
@@ -255,7 +268,7 @@ def blackJack(deck, played_deck, player_hand, dealer_hand, funds, bet, cards, Ca
         deck, player_hand, dealer_hand, played_deck, funds, end_round = round_end(deck, player_hand, dealer_hand,
                                                                                   played_deck,
                                                                                   funds, 0, bet, cards, CardSprite)
-        display_font = display(textFont, "Dealer has blackjack! You lose $%.2f." % (bet))
+        display_font = display(textFont, "Dealer has blackjack! You lose $%.1f." % (bet))
 
     return display_font, player_hand, dealer_hand, played_deck, funds, end_round
 
@@ -471,7 +484,7 @@ class DealButton(pygame.sprite.Sprite):
 textFont = pygame.font.Font(None, 28)
 
 # This sets up the background image, and its container rect
-background, backgroundRect = load_image("back.png", 0)
+background, backgroundRect = load_image("plansza.png", 0)
 
 # cards is the sprite group that will contain sprites for the dealer's cards
 cards = pygame.sprite.Group()
@@ -501,8 +514,8 @@ mX, mY = 0, 0
 click = 0
 
 # The default funds start at $100.00, and the initial bet defaults to $10.00
-funds = 100.00
-bet = 10.00
+funds = 100.0
+bet = 10.0
 
 # This is a counter that counts the number of rounds played in a given session
 handsPlayed = 0
@@ -529,9 +542,9 @@ while 1:
 
     # Show the blurb at the bottom of the screen, how much money left, and current bet
     screen.blit(display_font, (10, 444))
-    fundsFont = pygame.font.Font.render(textFont, "Funds: $%.2f" % (funds), 1, (255, 255, 255), (0, 0, 0))
+    fundsFont = pygame.font.Font.render(textFont, "Funds: $%.1f" % (funds), 1, (255, 255, 255), (0, 0, 0))
     screen.blit(fundsFont, (663, 205))
-    betFont = pygame.font.Font.render(textFont, "Bet: $%.2f" % (bet), 1, (255, 255, 255), (0, 0, 0))
+    betFont = pygame.font.Font.render(textFont, "Bet: $%.1f" % (bet), 1, (255, 255, 255), (0, 0, 0))
     screen.blit(betFont, (680, 285))
     hpFont = pygame.font.Font.render(textFont, "Round: %i " % (handsPlayed), 1, (255, 255, 255), (0, 0, 0))
     screen.blit(hpFont, (663, 180))
