@@ -173,7 +173,7 @@ def value(hand):
 
 def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, dealer_cards, CardSprite):
     if len(player_hand) == 2 and player_hand[:1] in aces:
-        money_gain += (money_gain * 3 / 2.0)
+        money_gain += (money_gain * 3 / 2)
 
     dealer_cards.empty()
 
