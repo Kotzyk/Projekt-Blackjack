@@ -125,7 +125,7 @@ def deck_deal(deck, played_deck):
     if len(deck) < 5:
         deck, played_deck = return_played(deck, played_deck)
 
-#wymaga dopracowania zwracania kart do talii, jeśli jest już pusta.
+# wymaga dopracowania zwracania kart do talii, jeśli jest już pusta.
     dealer_hand.append(deck.pop(0))
     played_deck.append(dealer_hand[-1])
     player_hand.append(deck.pop(0))
@@ -184,7 +184,6 @@ def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, mo
         dealer_card_position = (dealer_card_position[0] + 80, dealer_card_position[1])
         dealer_cards.add(card)
 
-    # Remove the cards from the player's and dealer's hands
     if not dealer_hand:
         for card in player_hand:
             played_deck.append(card)
@@ -208,7 +207,6 @@ def round_end(deck, player_hand, dealer_hand, played_deck, funds, money_gain, mo
 
 
 def bust(deck, player_hand, dealer_hand, played_deck, funds, money_gain, money_loss, dealer_cards, CardSprite):
-    """ This is only called when player busts by drawing too many cards. """
 
     font = pygame.font.Font(None, 28)
     display_font = display(font, "Gracz przebił! Przegrana: $%.1f." % money_loss)
@@ -556,11 +554,11 @@ while 1:
     screen.blit(background, backgroundRect)
 
     if bet > funds:
-        # If you lost money, and your bet is greater than your funds, make the bet equal to the funds
+       
         bet = funds
 
     if end_round == 1 and firstTime == 1:
-        # When the player hasn't started. Will only be displayed the first time.
+       
         display_font = display(textFont,
                                "Klikaj w strzałki, aby określić stawkę. Potem wciśnij Deal aby rozpocząć grę.")
         firstTime = 0
